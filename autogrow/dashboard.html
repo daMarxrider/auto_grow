@@ -1,0 +1,24 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>auto_grow</title>
+<style>body{font:16px sans-serif;margin:1em;max-width:900px}
+.v{display:flex;gap:1em;flex-wrap:wrap}.v div{flex:1;min-width:120px;background:#eee;padding:.5em;border-radius:6px}
+.v b{font-size:2em;display:block}svg{width:100%;height:160px;background:#fafafa;margin-bottom:1em}</style>
+<h1>auto_grow</h1>
+<div class=v><div>Temp<b id=t>-</b>°C</div><div>RH<b id=r>-</b>%</div><div>VPD<b id=p>-</b>kPa</div></div>
+<select id=range><option value=3600>1 hour<option value=86400>1 day<option value=604800 selected>7 days</select>
+<div id=charts></div>
+<script>
+const keys=[["temp","Temperature °C"],["rh","Humidity %"],["vpd","VPD kPa"]];
+function chart(d,k,l){
+  if(!d.length)return"";
+  const x0=d[0].ts,x1=d[d.length-1].ts||x0+1,v=d.map(e=>e[k]),lo=Math.min(...v),hi=Math.max(...v)||1;
+  const pts=d.map(e=>((e.ts-x0)/(x1-x0||1)*580+10)+","+(140-(e[k]-lo)/(hi-lo||1)*120)).join(" ");
+  return`<h3>${l} <small>${lo.toFixed(2)} – ${hi.toFixed(2)}</small></h3><svg viewBox="0 0 600 150"><polyline fill=none stroke=#2a7 stroke-width=2 points="${pts}"/></svg>`;
+}
+async function load(){
+  const d=await (await fetch("/api/readings?seconds="+range.value)).json();
+  if(d.length){const l=d[d.length-1];t.textContent=l.temp.toFixed(1);r.textContent=l.rh.toFixed(0);p.textContent=l.vpd.toFixed(2)}
+  charts.innerHTML=keys.map(([k,l])=>chart(d,k,l)).join("");
+}
+range.onchange=load;load();setInterval(load,30000);
+</script>
