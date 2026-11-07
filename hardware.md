@@ -9,6 +9,8 @@ Chosen parts for the build. Mains-voltage parts must be wired by someone qualifi
 | Camera | [Raspberry Pi Camera Module 3](https://www.raspberrypi.com/products/camera-module-3/) | Autofocus, native Pi support. Pick the NoIR version only if you add IR light |
 | Lamp dimming | PWM to 0-10 V converter module, e.g. [this type](https://rajivelectronics.com/product/pwm-to-voltage-0-100-to-10v-converter-module) | Works only if the lamp's driver has a 0-10 V dim input. Check this first (open point in the scope) |
 | Exhaust fan | 5 V opto-isolated relay module (any 2-channel, active-low) | Simple on/off. If the fan is EC with a 0-10 V or PWM input, use the same converter type as the lamp for speed control |
+| Soil moisture | [Adafruit STEMMA Soil Sensor](https://www.adafruit.com/product/4026) (I2C, address 0x36) | Capacitive (does not corrode like resistive probes), no ADC needed |
+| Water pump | 12 V peristaltic pump (dosing pump) + 12 V supply, switched by a third relay channel | Dosing is predictable, so ml/s can be calibrated and the daily cap means something. Any pump works if you measure its flow |
 | Safety cutoff | Mechanical thermostat (e.g. capillary or bimetal, set ~35 °C) wired in series with the lamp | Hardware limit that still works if the Pi or the software hangs |
 | Remote access | [Tailscale](https://tailscale.com/kb/1017/install) | No port forwarding, free for personal use |
 
@@ -20,9 +22,13 @@ Chosen parts for the build. Mains-voltage parts must be wired by someone qualifi
 | Lamp dimmer PWM | 18 |
 | Fan relay | 17 |
 | Lamp relay (software safety cutoff) | 27 |
+| Pump relay | 22 |
+| Soil sensor SDA / SCL | 2 / 3 (shared I2C bus) |
 
 ## Notes
 
 - I could not check stock or prices; the relay module and thermostat have no fixed link because any matching part works.
 - The Raspberry Pi pages blocked my link check (HTTP 403 to scripts), so verify those in a browser.
 - If the lamp is not dimmable, the lamp runs on/off via its relay only and dimming is skipped.
+
+- Watering: measure the pump's real flow (run it for 10 s into a cup) and pass it as `--ml-per-second`; calibrate the soil sensor's dry/wet raw values in `SeesawSoilSensor`. Keep the reservoir small enough that a stuck pump cannot flood the tent.

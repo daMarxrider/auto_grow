@@ -21,7 +21,7 @@ The full feature scope (in German) is in [docs/feature_scope_growbox.md](docs/fe
 
 ## Status
 
-Phase 1 (monitoring) and phase 2 (control) are merged; phase 3 (remote access, camera) is in progress. Chosen parts and wiring: [hardware.md](hardware.md).
+Phase 1 (monitoring) and phase 2 (control) are merged; phase 3 (remote access, camera) is in review; phase 4 (watering) is in progress. Chosen parts and wiring: [hardware.md](hardware.md).
 
 ## Run
 
@@ -31,6 +31,8 @@ python -m autogrow --sensor sht31          # SHT31 on I2C (Raspberry Pi)
 ```
 
 Add `--actuators gpio` to drive the fan/lamp through GPIO (needs `gpiozero`); the default `sim` only prints. Ideal ranges and limits: `--vpd-min --vpd-max --temp-soft-max --temp-hard-max`.
+
+Watering: `--watering sim|gpio` (soil sensor + pump). Options: `--dry-below --shot-seconds --ml-per-second --max-ml-per-day`. The daily cap applies to automatic and manual watering, and a failing soil sensor never triggers the pump.
 
 Remote access, password and camera: [docs/remote-access.md](docs/remote-access.md). Set `AUTOGROW_PASSWORD` to listen on the network; without it the dashboard is local-only. Add `--camera` for photos.
 

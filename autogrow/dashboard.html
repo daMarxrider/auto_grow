@@ -8,6 +8,8 @@
 <p>Fan <b id=fan>-</b> · Lamp <b id=lamp>-</b> <span id=ov></span><br>
 Override: <button onclick="ovr({fan:1})">Fan 100%</button> <button onclick="ovr({fan:0})">Fan off</button>
 <button onclick="ovr({lamp:0})">Lamp off</button> <button onclick="ovr({})">Auto</button> <small>(safety limits always win)</small></p>
+<p id=wat hidden>Soil <b id=soil>-</b>% · watered today <b id=ml>-</b>/<span id=mx></span> ml
+<button onclick="water()">Water now</button> <span id=wmsg></span></p>
 <div id=cam hidden><h3>Camera <button onclick="snap()">Take photo now</button></h3>
 <img id=photo style="max-width:100%"><div id=thumbs style="display:flex;gap:4px;overflow-x:auto"></div></div>
 <select id=range><option value=3600>1 hour<option value=86400>1 day<option value=604800 selected>7 days</select>
@@ -26,6 +28,11 @@ async function cams(){
   photo.src="/photos/"+l[l.length-1];photo.title=new Date(parseInt(l[l.length-1])*1000).toLocaleString();
   thumbs.innerHTML=l.slice().reverse().map(n=>`<img height=60 title="${new Date(parseInt(n)*1000).toLocaleString()}" src="/photos/${n}" onclick="photo.src=this.src">`).join("");
 }
+async function wstat(){
+  const r=await fetch("/api/water");if(!r.ok)return;wat.hidden=false;const w=await r.json();
+  soil.textContent=w.soil==null?"-":w.soil.toFixed(0);ml.textContent=Math.round(w.ml_today);mx.textContent=w.max_ml;
+}
+async function water(){const r=await fetch("/api/water",{method:"POST"});wmsg.textContent=r.ok?"watered":"daily limit reached";wstat()}
 async function snap(){await fetch("/api/camera/capture",{method:"POST"});cams()}
 async function ovr(o){await fetch("/api/override",{method:"POST",body:JSON.stringify(o)});load()}
 async function load(){
@@ -36,5 +43,5 @@ async function load(){
   if(d.length){const l=d[d.length-1];t.textContent=l.temp.toFixed(1);r.textContent=l.rh.toFixed(0);p.textContent=l.vpd.toFixed(2)}
   charts.innerHTML=keys.map(([k,l])=>chart(d,k,l)).join("");
 }
-range.onchange=load;load();cams();setInterval(load,30000);setInterval(cams,300000);
+range.onchange=load;load();cams();wstat();setInterval(load,30000);setInterval(cams,300000);setInterval(wstat,60000);
 </script>
