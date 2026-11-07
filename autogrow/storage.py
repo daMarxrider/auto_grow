@@ -11,6 +11,13 @@ class Storage:
             "CREATE TABLE IF NOT EXISTS readings"
             "(ts REAL PRIMARY KEY, temp REAL, rh REAL, vpd REAL)"
         )
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS actions(ts REAL, fan REAL, lamp REAL, reason TEXT)"
+        )
+
+    def log_action(self, fan, lamp, reason):
+        self.db.execute("INSERT INTO actions VALUES (?,?,?,?)", (time.time(), fan, lamp, reason))
+        self.db.commit()
 
     def add(self, temp, rh, ts=None):
         self.db.execute(
