@@ -14,6 +14,7 @@ from .camera import Camera, capture_loop
 from .control import Config, Controller
 from .sensors import make_sensor
 from .storage import Storage
+from .watering import GpioPump, SeesawSoilSensor, SimPump, SimSoilSensor, WaterConfig, Waterer, watering_loop
 
 
 def collect(sensor, storage, interval, ctl):
@@ -28,7 +29,7 @@ def collect(sensor, storage, interval, ctl):
         time.sleep(interval)
 
 
-def make_handler(storage, ctl, camera=None, password=None):
+def make_handler(storage, ctl, camera=None, password=None, waterer=None):
     class H(BaseHTTPRequestHandler):
         def authed(self):
             """HTTP Basic auth (any user name). Sends the 401 itself on failure."""
@@ -56,6 +57,12 @@ def make_handler(storage, ctl, camera=None, password=None):
                 if body is None:
                     self.send_error(404)
                     return
+            elif u.path == "/api/water" and waterer:
+                body, ctype = json.dumps({
+                    "soil": storage.last_soil(),
+                    "ml_today": storage.water_ml_since(86400),
+                    "max_ml": waterer.cfg.max_ml_per_day,
+                }).encode(), "application/json"
             elif u.path == "/api/readings":
                 secs = int(parse_qs(u.query).get("seconds", ["604800"])[0])
                 body, ctype = json.dumps(storage.since(secs)).encode(), "application/json"
@@ -83,6 +90,12 @@ def make_handler(storage, ctl, camera=None, password=None):
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(name.encode())
+                return
+            if urlparse(self.path).path == "/api/water" and waterer:
+                ml = waterer.water("manual")
+                self.send_response(200 if ml else 429)  # 429: daily cap reached
+                self.end_headers()
+                self.wfile.write(json.dumps({"ml": ml}).encode())
                 return
             if urlparse(self.path).path != "/api/override":
                 self.send_error(404)
@@ -119,6 +132,12 @@ def main():
     ap.add_argument("--camera-dir", default="photos")
     ap.add_argument("--photo-minutes", type=int, default=10)
     ap.add_argument("--host", default=None, help="bind address (default: 0.0.0.0 with a password, else 127.0.0.1)")
+    ap.add_argument("--watering", choices=["off", "sim", "gpio"], default="off")
+    ap.add_argument("--soil-minutes", type=int, default=30)
+    ap.add_argument("--dry-below", type=float, default=35.0, help="soil moisture %% that triggers watering")
+    ap.add_argument("--shot-seconds", type=float, default=10.0)
+    ap.add_argument("--ml-per-second", type=float, default=5.0, help="pump calibration")
+    ap.add_argument("--max-ml-per-day", type=float, default=500.0)
     a = ap.parse_args()
     password = os.environ.get("AUTOGROW_PASSWORD") or None
     host = a.host or ("0.0.0.0" if password else "127.0.0.1")
@@ -128,11 +147,18 @@ def main():
     storage = Storage(a.db)
     ctl = Controller(cfg, GpioActuators() if a.actuators == "gpio" else SimActuators(), storage)
     threading.Thread(target=collect, args=(make_sensor(a.sensor), storage, a.interval, ctl), daemon=True).start()
+    waterer = None
+    if a.watering != "off":
+        wc = WaterConfig(a.dry_below, a.shot_seconds, a.ml_per_second, a.max_ml_per_day)
+        gpio = a.watering == "gpio"
+        waterer = Waterer(wc, GpioPump() if gpio else SimPump(), storage)
+        soil = SeesawSoilSensor() if gpio else SimSoilSensor()
+        threading.Thread(target=watering_loop, args=(soil, waterer, storage, a.soil_minutes), daemon=True).start()
     camera = Camera(a.camera_dir, a.camera_cmd) if a.camera else None
     if camera:
         threading.Thread(target=capture_loop, args=(camera, a.photo_minutes), daemon=True).start()
     print(f"Dashboard on http://{host}:{a.port}" + ("" if password else " (local only, no AUTOGROW_PASSWORD set)"))
-    ThreadingHTTPServer((host, a.port), make_handler(storage, ctl, camera, password)).serve_forever()
+    ThreadingHTTPServer((host, a.port), make_handler(storage, ctl, camera, password, waterer)).serve_forever()
 
 
 main() if __name__ == "__main__" else None
