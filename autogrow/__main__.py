@@ -1,5 +1,8 @@
 import argparse
+import base64
+import hmac
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -7,6 +10,7 @@ from importlib.resources import files
 from urllib.parse import parse_qs, urlparse
 
 from .actuators import GpioActuators, SimActuators
+from .camera import Camera, capture_loop
 from .control import Config, Controller
 from .sensors import make_sensor
 from .storage import Storage
@@ -24,11 +28,35 @@ def collect(sensor, storage, interval, ctl):
         time.sleep(interval)
 
 
-def make_handler(storage, ctl):
+def make_handler(storage, ctl, camera=None, password=None):
     class H(BaseHTTPRequestHandler):
+        def authed(self):
+            """HTTP Basic auth (any user name). Sends the 401 itself on failure."""
+            if password is None:
+                return True
+            try:
+                given = base64.b64decode(self.headers.get("Authorization", "")[6:]).decode().partition(":")[2]
+            except ValueError:
+                given = ""
+            if hmac.compare_digest(given.encode(), password.encode()):
+                return True
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="auto_grow"')
+            self.end_headers()
+            return False
+
         def do_GET(self):
+            if not self.authed():
+                return
             u = urlparse(self.path)
-            if u.path == "/api/readings":
+            if u.path == "/api/camera" and camera:
+                body, ctype = json.dumps(camera.list()[-48:]).encode(), "application/json"
+            elif u.path.startswith("/photos/") and camera:
+                body, ctype = camera.read(u.path[8:]), "image/jpeg"
+                if body is None:
+                    self.send_error(404)
+                    return
+            elif u.path == "/api/readings":
                 secs = int(parse_qs(u.query).get("seconds", ["604800"])[0])
                 body, ctype = json.dumps(storage.since(secs)).encode(), "application/json"
             elif u.path == "/api/status":
@@ -44,6 +72,18 @@ def make_handler(storage, ctl):
             self.wfile.write(body)
 
         def do_POST(self):
+            if not self.authed():
+                return
+            if urlparse(self.path).path == "/api/camera/capture" and camera:
+                try:
+                    name = camera.capture()
+                except Exception:
+                    self.send_error(500, "capture failed")
+                    return
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(name.encode())
+                return
             if urlparse(self.path).path != "/api/override":
                 self.send_error(404)
                 return
@@ -74,13 +114,25 @@ def main():
     ap.add_argument("--vpd-max", type=float, default=1.2)
     ap.add_argument("--temp-soft-max", type=float, default=28.0)
     ap.add_argument("--temp-hard-max", type=float, default=32.0)
+    ap.add_argument("--camera", action="store_true", help="enable the tent camera")
+    ap.add_argument("--camera-cmd", default="rpicam-still -n -t 1 -o {out}")
+    ap.add_argument("--camera-dir", default="photos")
+    ap.add_argument("--photo-minutes", type=int, default=10)
+    ap.add_argument("--host", default=None, help="bind address (default: 0.0.0.0 with a password, else 127.0.0.1)")
     a = ap.parse_args()
+    password = os.environ.get("AUTOGROW_PASSWORD") or None
+    host = a.host or ("0.0.0.0" if password else "127.0.0.1")
+    if password is None and host != "127.0.0.1":
+        ap.error("set AUTOGROW_PASSWORD to listen on a non-local address")
     cfg = Config(a.vpd_min, a.vpd_max, a.temp_soft_max, a.temp_hard_max)
     storage = Storage(a.db)
     ctl = Controller(cfg, GpioActuators() if a.actuators == "gpio" else SimActuators(), storage)
     threading.Thread(target=collect, args=(make_sensor(a.sensor), storage, a.interval, ctl), daemon=True).start()
-    print(f"Dashboard on http://0.0.0.0:{a.port}")
-    ThreadingHTTPServer(("0.0.0.0", a.port), make_handler(storage, ctl)).serve_forever()
+    camera = Camera(a.camera_dir, a.camera_cmd) if a.camera else None
+    if camera:
+        threading.Thread(target=capture_loop, args=(camera, a.photo_minutes), daemon=True).start()
+    print(f"Dashboard on http://{host}:{a.port}" + ("" if password else " (local only, no AUTOGROW_PASSWORD set)"))
+    ThreadingHTTPServer((host, a.port), make_handler(storage, ctl, camera, password)).serve_forever()
 
 
 main() if __name__ == "__main__" else None
