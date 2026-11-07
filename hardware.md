@@ -23,6 +23,5 @@ Chosen parts for the build. Mains-voltage parts must be wired by someone qualifi
 
 ## Notes
 
-- I could not check stock or prices; the relay module and thermostat have no fixed link because any matching part works.
-- The Raspberry Pi pages blocked my link check (HTTP 403 to scripts), so verify those in a browser.
+
 - If the lamp is not dimmable, the lamp runs on/off via its relay only and dimming is skipped.
