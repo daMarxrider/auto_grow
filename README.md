@@ -21,7 +21,7 @@ The full feature scope (in German) is in [docs/feature_scope_growbox.md](docs/fe
 
 ## Status
 
-Phase 1 (monitoring) and phase 2 (control) are merged; phase 3 (remote access, camera) is in review; phase 4 (watering) is in progress. Chosen parts and wiring: [hardware.md](hardware.md).
+Phases 1-4 (monitoring, control, remote access & camera, watering) are all implemented and merged. Chosen parts and wiring: [hardware.md](hardware.md).
 
 ## Run
 
