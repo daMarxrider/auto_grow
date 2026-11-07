@@ -1,0 +1,17 @@
+# Install: sudo cp deploy/autogrow.service /etc/systemd/system/ && sudo systemctl enable --now autogrow
+# Put the secret in /etc/autogrow.env as: AUTOGROW_PASSWORD=...  (chmod 600)
+[Unit]
+Description=auto_grow tent controller
+After=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/auto_grow
+EnvironmentFile=/etc/autogrow.env
+ExecStart=/usr/bin/python3 -m autogrow --sensor sht31 --actuators gpio --camera
+# restart after a crash; actuators fall back to their relay defaults while it is down
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -8,6 +8,8 @@
 <p>Fan <b id=fan>-</b> · Lamp <b id=lamp>-</b> <span id=ov></span><br>
 Override: <button onclick="ovr({fan:1})">Fan 100%</button> <button onclick="ovr({fan:0})">Fan off</button>
 <button onclick="ovr({lamp:0})">Lamp off</button> <button onclick="ovr({})">Auto</button> <small>(safety limits always win)</small></p>
+<div id=cam hidden><h3>Camera <button onclick="snap()">Take photo now</button></h3>
+<img id=photo style="max-width:100%"><div id=thumbs style="display:flex;gap:4px;overflow-x:auto"></div></div>
 <select id=range><option value=3600>1 hour<option value=86400>1 day<option value=604800 selected>7 days</select>
 <div id=charts></div>
 <script>
@@ -18,6 +20,13 @@ function chart(d,k,l){
   const pts=d.map(e=>((e.ts-x0)/(x1-x0||1)*580+10)+","+(140-(e[k]-lo)/(hi-lo||1)*120)).join(" ");
   return`<h3>${l} <small>${lo.toFixed(2)} – ${hi.toFixed(2)}</small></h3><svg viewBox="0 0 600 150"><polyline fill=none stroke=#2a7 stroke-width=2 points="${pts}"/></svg>`;
 }
+async function cams(){
+  const r=await fetch("/api/camera");if(!r.ok)return;cam.hidden=false;
+  const l=await r.json();if(!l.length)return;
+  photo.src="/photos/"+l[l.length-1];photo.title=new Date(parseInt(l[l.length-1])*1000).toLocaleString();
+  thumbs.innerHTML=l.slice().reverse().map(n=>`<img height=60 title="${new Date(parseInt(n)*1000).toLocaleString()}" src="/photos/${n}" onclick="photo.src=this.src">`).join("");
+}
+async function snap(){await fetch("/api/camera/capture",{method:"POST"});cams()}
 async function ovr(o){await fetch("/api/override",{method:"POST",body:JSON.stringify(o)});load()}
 async function load(){
   const st=await (await fetch("/api/status")).json();
@@ -27,5 +36,5 @@ async function load(){
   if(d.length){const l=d[d.length-1];t.textContent=l.temp.toFixed(1);r.textContent=l.rh.toFixed(0);p.textContent=l.vpd.toFixed(2)}
   charts.innerHTML=keys.map(([k,l])=>chart(d,k,l)).join("");
 }
-range.onchange=load;load();setInterval(load,30000);
+range.onchange=load;load();cams();setInterval(load,30000);setInterval(cams,300000);
 </script>
