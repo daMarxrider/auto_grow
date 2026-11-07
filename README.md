@@ -21,7 +21,7 @@ The full feature scope (in German) is in [docs/feature_scope_growbox.md](docs/fe
 
 ## Status
 
-Phase 1 (monitoring) is in progress.
+Phase 1 (monitoring) and phase 2 (control) are in progress. Chosen parts and wiring: [hardware.md](hardware.md).
 
 ## Run
 
@@ -29,5 +29,7 @@ Phase 1 (monitoring) is in progress.
 python -m autogrow --sensor sim            # simulated sensor, no hardware needed
 python -m autogrow --sensor sht31          # SHT31 on I2C (Raspberry Pi)
 ```
+
+Add `--actuators gpio` to drive the fan/lamp through GPIO (needs `gpiozero`); the default `sim` only prints. Ideal ranges and limits: `--vpd-min --vpd-max --temp-soft-max --temp-hard-max`.
 
 Dashboard: http://localhost:8080 (options: `--interval`, `--db`, `--port`). Tests: `pytest`.
