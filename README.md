@@ -21,4 +21,13 @@ The full feature scope (in German) is in [docs/feature_scope_growbox.md](docs/fe
 
 ## Status
 
-Draft: no code yet.
+Phase 1 (monitoring) is in progress.
+
+## Run
+
+```
+python -m autogrow --sensor sim            # simulated sensor, no hardware needed
+python -m autogrow --sensor sht31          # SHT31 on I2C (Raspberry Pi)
+```
+
+Dashboard: http://localhost:8080 (options: `--interval`, `--db`, `--port`). Tests: `pytest`.
